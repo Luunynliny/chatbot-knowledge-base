@@ -11,7 +11,7 @@
 
 2. Enable [Docker Model Runner](https://docs.docker.com/ai/model-runner/get-started/#docker-desktop)
 
-3. Pull `granite-4.0-nano:latest` model
+3. Pull `mistral:latest` model
 
 4. Run the model
 
@@ -38,13 +38,13 @@ services:
     volumes:
       - open-webui:/app/backend/data
     depends_on:
-    - docker-model-runner-granite
+    - docker-model-runner-mistral
 
-  docker-model-runner-granite:
+  docker-model-runner-mistral:
     provider:
       type: model
       options:
-        model: ai/granite-4.0-nano
+        model: ai/mistral-4.0-nano
 
 volumes:
   open-webui:
@@ -63,7 +63,7 @@ services:
     open-webui:
         # ...
         depends_on:
-            - docker-model-runner-granite
+            - docker-model-runner-mistral
             - docker-model-runner-smoll
 
     # ...
@@ -84,16 +84,88 @@ uv venv
 source .venv/bin/activate
 ```
 
-2. Install [mcp](https://github.com/modelcontextprotocol/python-sdk) package
+2. Install the [mcp](https://github.com/modelcontextprotocol/python-sdk) package
 
 ```bash
 uv pip install mcp
 ```
 
-3. Make tool available in opneWebUI settings > https://localhost:8000
+3. Create a first MCP tool
 
+```python
+# servers/resources_server.py
+from mcp.server.fastmcp import FastMCP
 
+mcp = FastMCP(name="resources-server")
 
-to check it's working : http://localhost:8000/docs
+@mcp.tool()
+def get_asburd_poem() -> str:
+    """
+    Return content of the "Absurd Poem".
+    """
+    absurd_poem = """
+The Moon Wore Socks Today
 
-Some model are not MCP tool compatible
+The moon wore socks today—
+bright orange, with ducks that quack
+whenever Jupiter sneezes.
+A polite applause from passing meteors
+echoed across the soup of night.
+"""
+
+    return absurd_poem
+
+if __name__ == "__main__":
+    mcp.run()
+```
+
+4. Configure [mcpo](https://github.com/open-webui/mcpo)
+
+```dockerfile
+# mcpo/dockerfile
+FROM python:3.11-slim
+
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+RUN pip install --no-cache-dir mcpo uv
+
+WORKDIR /app
+
+CMD ["mcpo", "--host", "0.0.0.0", "--port", "8000", "--config", "/app/config/config.json"]
+```
+
+```json
+# mcpo/config.json
+{
+  "mcpServers": {
+    "resources-server": {
+      "command": "python",
+      "args": ["/app/servers/resources_server.py"]
+    }
+  }
+}
+```
+
+5. Create mcpo container
+
+```yaml
+services:
+    # ...
+
+    mcpo:
+        build:
+          context: ./mcpo
+        container_name: mcpo
+        ports:
+          - "8000:8000"
+        volumes:
+          - ./mcpo/config.json:/app/config/config.json:ro
+          - ./servers:/app/servers:ro
+        restart: unless-stopped
+```
+
+6. Build docker and check the [MCP server health](http://localhost:8000/docs) 
+
+7. Not all LLM model are compatible
