@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "resources-server": {
+      "command": "python",
+      "args": ["/app/servers/resources_server.py"]
+    }
+  }
+}

@@ -1,6 +1,7 @@
 ## Requirements
 - MacOS
 - [Docker Desktop](https://docs.docker.com/desktop/setup/install/mac-install/)
+- [uv](https://docs.astral.sh/uv/getting-started/installation/)
 
 ## Instructions
 
@@ -73,3 +74,26 @@ services:
             model: ai/smollm2
     # ...
 ```
+
+### MCP
+
+1. Setup virtual environment
+
+```bash
+uv venv
+source .venv/bin/activate
+```
+
+2. Install [mcp](https://github.com/modelcontextprotocol/python-sdk) package
+
+```bash
+uv pip install mcp
+```
+
+3. Make tool available in opneWebUI settings > https://localhost:8000
+
+
+
+to check it's working : http://localhost:8000/docs
+
+Some model are not MCP tool compatible

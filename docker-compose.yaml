@@ -10,20 +10,31 @@ services:
     volumes:
       - open-webui:/app/backend/data
     depends_on:
-      - docker-model-runner-granite
+      - docker-model-runner-mistral
       - docker-model-runner-smoll
 
-  docker-model-runner-granite:
+  docker-model-runner-mistral:
     provider:
       type: model
       options:
-        model: ai/granite-4.0-nano
+        model: ai/mistral
 
   docker-model-runner-smoll:
     provider:
       type: model
       options:
         model: ai/smollm2
+
+  mcpo:
+    build:
+      context: ./mcpo
+    container_name: mcpo
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./mcpo/config.json:/app/config/config.json:ro
+      - ./servers:/app/servers:ro
+    restart: unless-stopped
 
 volumes:
   open-webui:
