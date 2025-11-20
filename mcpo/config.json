@@ -3,6 +3,10 @@
     "resources-server": {
       "command": "python",
       "args": ["/app/servers/resources_server.py"]
+    },
+    "financials-server": {
+      "command": "python",
+      "args": ["/app/servers/financials_server.py"]
     }
   }
 }

@@ -44,7 +44,7 @@ services:
     provider:
       type: model
       options:
-        model: ai/mistral-4.0-nano
+        model: ai/mistral
 
 volumes:
   open-webui:
@@ -73,9 +73,13 @@ services:
         options:
             model: ai/smollm2
     # ...
+
+# ...
 ```
 
 ### MCP
+
+#### First server
 
 1. Setup virtual environment
 
@@ -164,8 +168,139 @@ services:
           - ./mcpo/config.json:/app/config/config.json:ro
           - ./servers:/app/servers:ro
         restart: unless-stopped
+
+# ...
 ```
 
-6. Build docker and check the [MCP server health](http://localhost:8000/docs) 
+6. Build docker and check the [MCP server health](http://localhost:8000/docs)
 
-7. Not all LLM model are compatible
+7. In Open WebUI `Settings > External Tools > Manage Tool Servers`, add a connection to `http://localhost:8000/resources-server`
+
+8. Test MCP with `mistral` and `smollm2`: not all LLM model are compatible
+
+#### Connect to a MongoDB
+
+1. Add a new server
+
+```python
+# servers/financial_server.py
+from mcp.server.fastmcp import FastMCP
+from pymongo import MongoClient
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+mcp = FastMCP(name="financials-server")
+
+MONGO_URL = f"mongodb://{os.environ['MONGODB_USER']}:{os.environ['MONGODB_PWD']}@mongodb:27017/?authSource=admin"
+
+@mcp.tool()
+def sum_expenses_for_a_category(
+    category: str
+) -> float | None:
+    """
+    Query the MongoDB 'financials.expenses' collection and return the total amount
+    spent for the given expense category.
+
+    Use this tool whenever the user asks things like:
+    - "How much did I spend for Marketing in total?"
+    - "What is the total I spent on Travel?"
+    - "Sum of all Office expenses"
+
+    Returns:
+        The total sum of 'amount' for all expenses in the given category,
+        or None if the category does not exist or no matching expenses are found.
+    """
+
+    client = MongoClient(MONGO_URL)
+    db = client["financials"]
+
+    pipeline = [
+        { "$match": { "category": category } },
+        {
+            "$group": {
+                "_id": None,
+                "total": { "$sum": "$amount" }
+            }
+        }
+    ]
+
+    result = list(db["expenses"].aggregate(pipeline))
+
+    if not result:
+        return None
+
+    return float(result[0]["total"])
+
+if __name__ == "__main__":
+    mcp.run()
+```
+
+2. Add database credentials
+
+```yaml
+# servers/.env
+MONGODB_USER=user
+MONGODB_PWD=root
+```
+
+3. Provide data
+
+```javascript
+// mongo-init.js
+db = db.getSiblingDB('financials');
+db.createCollection('expenses');
+
+db.expenses.insertMany([
+    { date: new Date("2024-01-01"), category: "Office", amount: 45.90 },
+    { date: new Date("2024-01-02"), category: "Travel", amount: 120.00 },
+    { date: new Date("2024-01-03"), category: "Meals", amount: 18.50 },
+    { date: new Date("2024-01-04"), category: "Software", amount: 29.99 },
+    { date: new Date("2024-01-05"), category: "Office", amount: 67.20 },
+    { date: new Date("2024-01-06"), category: "Marketing", amount: 200.00 },
+    { date: new Date("2024-01-07"), category: "Travel", amount: 89.00 },
+    { date: new Date("2024-01-08"), category: "Meals", amount: 22.10 },
+    { date: new Date("2024-01-09"), category: "Software", amount: 14.00 },
+    { date: new Date("2024-01-10"), category: "Office", amount: 34.50 },
+    { date: new Date("2024-01-11"), category: "Travel", amount: 155.40 },
+    { date: new Date("2024-01-12"), category: "Meals", amount: 16.00 },
+    { date: new Date("2024-01-13"), category: "Marketing", amount: 120.00 },
+    { date: new Date("2024-01-14"), category: "Office", amount: 53.70 },
+    { date: new Date("2024-01-15"), category: "Software", amount: 39.99 },
+    { date: new Date("2024-01-16"), category: "Travel", amount: 210.00 },
+    { date: new Date("2024-01-17"), category: "Meals", amount: 12.80 },
+    { date: new Date("2024-01-18"), category: "Office", amount: 27.90 },
+    { date: new Date("2024-01-19"), category: "Travel", amount: 98.00 },
+    { date: new Date("2024-01-20"), category: "Marketing", amount: 300.00 }
+]);
+
+print("Dummy expenses inserted.");
+```
+
+4. Create the database container
+
+```yaml
+services:
+    # ...
+
+    mongodb:
+        image: mongodb/mongodb-community-server:latest
+        container_name: mongodb
+        ports:
+            - "27017:27017"
+        volumes:
+            - mongodb:/data/db
+            - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+        environment:
+            MONGO_INITDB_ROOT_USERNAME: ${MONGODB_USER}
+            MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PWD}
+
+volumes:
+  # ...
+  mongodb:
+```
+
+5. Rebuild docker
+
+6. In Open WebUI, add a connection to `http://localhost:8000/financials-server`
