@@ -17,12 +17,6 @@
 
 ### Setup OpenWebUI
 
-1. Pull OpenWebUI image
-
-```bash
-docker pull ghcr.io/open-webui/open-webui:main
-```
-
 1. Create a `docker-compose.yaml`
 
 ```yaml
