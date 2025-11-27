@@ -11,9 +11,9 @@
 
 2. Enable [Docker Model Runner](https://docs.docker.com/ai/model-runner/get-started/#docker-desktop)
 
-3. Pull `mistral:latest` model
+3. Pull `mistral:latest` model (Docker desktop)
 
-4. Run the model
+4. Run the model (Docker desktop)
 
 ### Setup OpenWebUI
 
@@ -26,6 +26,7 @@ docker pull ghcr.io/open-webui/open-webui:main
 1. Create a `docker-compose.yaml`
 
 ```yaml
+# docker-compose.yaml
 services:
   open-webui:
     image: ghcr.io/open-webui/open-webui:main
@@ -52,13 +53,14 @@ volumes:
 
 2. Build `docker compose up`
 
-3. Access OpenWebUI at `localhost:3000`
+3. Access OpenWebUI at http://localhost:3000/
 
-4. Pull `smollm2:latest` model
+4. Pull `smollm2:latest` model (Docker desktop)
 
 5. Update the configuration
 
 ```yaml
+# docker-compose.yaml
 services:
     open-webui:
         # ...
@@ -237,7 +239,18 @@ if __name__ == "__main__":
     mcp.run()
 ```
 
-2. Add database credentials
+2. Update `mcpo` dockerfile packages
+
+```dockerfile
+# mcpo/dockerfile
+#...
+
+RUN pip install --no-cache-dir mcpo uv pymongo dotenv mcp
+
+# ...
+```
+
+3. Add database credentials
 
 ```yaml
 # servers/.env
@@ -245,7 +258,7 @@ MONGODB_USER=user
 MONGODB_PWD=root
 ```
 
-3. Provide data
+4. Provide data
 
 ```javascript
 // mongo-init.js
@@ -278,7 +291,7 @@ db.expenses.insertMany([
 print("Dummy expenses inserted.");
 ```
 
-4. Create the database container
+5. Create the database container
 
 ```yaml
 services:
@@ -301,6 +314,69 @@ volumes:
   mongodb:
 ```
 
-5. Rebuild docker
+6. Rebuild docker
 
-6. In Open WebUI, add a connection to `http://localhost:8000/financials-server`
+7. In Open WebUI, add a connection to `http://localhost:8000/financials-server`
+
+#### Connect to an API
+
+1. Add API URL in `.env`
+
+```yaml
+# servers/.env
+#...
+
+TIME_API_URL=https://timeapi.io/api/time/current/zone?timeZone=Europe%2FParis
+```
+
+2. Add a new `get_current_datetime` tool to the `resources_server`
+
+```python
+# servers/resources_server.py
+import json
+import os
+import requests
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# ...
+
+@mcp.tool()
+def get_current_datetime() -> str:
+    """
+    Returns the current datetime
+
+    Use this tool whenever the user asks things like:
+    - "What date is it today?"
+    - "What day are we?"
+    - "What is the current time?"
+
+    Returns:
+        The current datetime.
+    """
+    response = requests.get(os.getenv("TIME_API_URL"))
+
+    if response.status_code == 200:
+        data = json.loads(response.text)
+        return json.dumps(data, indent=4)
+    else:
+        print("Failed to fetch data from the API")
+
+# Must be included before the "main"
+# ...
+```
+
+3. Update `mcpo` dockerfile packages
+
+```dockerfile
+# mcpo/dockerfile
+#...
+
+RUN pip install --no-cache-dir mcpo uv pymongo dotenv mcp requests
+
+# ...
+```
+
+4. Rebuild docker
