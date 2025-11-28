@@ -5,6 +5,9 @@
 
 ## Instructions
 
+> [!WARNING]  
+> When copy-pasting yaml configuration, make sure to check the indentation.
+
 ### Install an LLM model using DMR
 
 1. Setup [Docker](https://docs.docker.com/engine/install/)
@@ -129,7 +132,7 @@ ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-RUN pip install --no-cache-dir mcpo uv
+RUN pip install --no-cache-dir mcp mcpo uv
 
 WORKDIR /app
 
@@ -172,11 +175,17 @@ services:
 
 7. In Open WebUI `Settings > External Tools > Manage Tool Servers`, add a connection to `http://localhost:8000/resources-server`
 
-8. Test MCP with `mistral` and `smollm2`: not all LLM model are compatible
+8. Test MCP with `mistral` and `smollm2`: not all LLM model are MCP compatible
 
 #### Connect to a MongoDB
 
-1. Add a new server
+1. Install `pymongo`, `python-dotenv`
+
+```bash
+uv pip install pymongo python-dotenv
+```
+
+2. Add a new server
 
 ```python
 # servers/financial_server.py
@@ -233,18 +242,18 @@ if __name__ == "__main__":
     mcp.run()
 ```
 
-2. Update `mcpo` dockerfile packages
+3. Update `mcpo` dockerfile packages
 
 ```dockerfile
 # mcpo/dockerfile
 #...
 
-RUN pip install --no-cache-dir mcpo uv pymongo dotenv mcp
+RUN pip install --no-cache-dir mcpo uv pymongo python-dotenv mcp
 
 # ...
 ```
 
-3. Add database credentials
+4. Add database credentials
 
 ```yaml
 # servers/.env
@@ -252,7 +261,7 @@ MONGODB_USER=user
 MONGODB_PWD=root
 ```
 
-4. Provide data
+5. Provide data
 
 ```javascript
 // mongo-init.js
@@ -285,7 +294,7 @@ db.expenses.insertMany([
 print("Dummy expenses inserted.");
 ```
 
-5. Create the database container
+6. Create the database container
 
 ```yaml
 services:
@@ -299,6 +308,8 @@ services:
         volumes:
             - mongodb:/data/db
             - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+        env_file:
+            - ./server/.env 
         environment:
             MONGO_INITDB_ROOT_USERNAME: ${MONGODB_USER}
             MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PWD}
@@ -308,9 +319,23 @@ volumes:
   mongodb:
 ```
 
-6. Rebuild docker
+7. Update `mcpo/config.json`
 
-7. In Open WebUI, add a connection to `http://localhost:8000/financials-server`
+```json
+{
+  "mcpServers": {
+    // ...
+    "financials-server": {
+      "command": "python",
+      "args": ["/app/servers/financials_server.py"]
+    }
+  }
+}
+```
+
+7. Rebuild docker
+
+8. In Open WebUI, add a connection to `http://localhost:8000/financials-server`
 
 #### Connect to an API
 
@@ -368,7 +393,7 @@ def get_current_datetime() -> str:
 # mcpo/dockerfile
 #...
 
-RUN pip install --no-cache-dir mcpo uv pymongo dotenv mcp requests
+RUN pip install --no-cache-dir mcp mcpo uv pymongo dotenv requests
 
 # ...
 ```
