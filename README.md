@@ -1,3 +1,7 @@
+## Demo
+
+![demo](demo.gif)
+
 ## Requirements
 - MacOS
 - [Docker Desktop](https://docs.docker.com/desktop/setup/install/mac-install/)
